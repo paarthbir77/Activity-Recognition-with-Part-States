@@ -12,6 +12,8 @@ from tf_pose import common
 from tf_pose.common import CocoPart
 from tf_pose.tensblur.smoother import Smoother
 from tensorflow.python.compiler.tensorrt import trt_convert as trt
+tf.compat.v1.disable_eager_execution()
+
 
 try:
     from tf_pose.pafprocess import pafprocess
@@ -335,6 +337,7 @@ class TfPoseEstimator:
             print(ts)
 
         self.tensor_image = self.graph.get_tensor_by_name('TfPoseEstimator/image:0')
+        
         self.tensor_output = self.graph.get_tensor_by_name('TfPoseEstimator/Openpose/concat_stage7:0')
         self.tensor_heatMat = self.tensor_output[:, :, :, :19]
         self.tensor_pafMat = self.tensor_output[:, :, :, 19:]
@@ -410,6 +413,8 @@ class TfPoseEstimator:
             npimg = np.copy(npimg)
         image_h, image_w = npimg.shape[:2]
         centers = {}
+        # list to return body part id, center
+        return_part_list = []
         for human in humans:
             # draw point
             for i in range(common.CocoPart.Background.value):
@@ -419,6 +424,9 @@ class TfPoseEstimator:
                 body_part = human.body_parts[i]
                 center = (int(body_part.x * image_w + 0.5), int(body_part.y * image_h + 0.5))
                 centers[i] = center
+                # Append body part id, x co-ordinate and y co-ordinate
+                return_part_list.append([str(body_part.uidx)[2:],center[0], center[1]])
+                
                 cv2.circle(npimg, center, 3, common.CocoColors[i], thickness=3, lineType=8, shift=0)
 
             # draw line
@@ -429,7 +437,8 @@ class TfPoseEstimator:
                 # npimg = cv2.line(npimg, centers[pair[0]], centers[pair[1]], common.CocoColors[pair_order], 3)
                 cv2.line(npimg, centers[pair[0]], centers[pair[1]], common.CocoColors[pair_order], 3)
 
-        return npimg
+        #print(return_part_list)
+        return npimg, return_part_list
 
     def _get_scaled_img(self, npimg, scale):
         get_base_scale = lambda s, w, h: max(self.target_size[0] / float(h), self.target_size[1] / float(w)) * s
